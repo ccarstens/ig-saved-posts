@@ -1,9 +1,11 @@
-package main
+package domain
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
+	"github.com/ccarstens/ig-saved-posts/src/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,6 +46,15 @@ func Test_ReadConfig(t *testing.T) {
 			},
 			expectedError: func(tt assert.TestingT, err error, i ...interface{}) bool {
 				return assert.Nil(tt, err)
+			},
+		},
+		"error on read - file does not exist - empty config is returned": {
+			ReadFileFn: func(path string) ([]byte, error) {
+				return nil, os.ErrNotExist
+			},
+			expectedConfig: &Config{},
+			expectedError: func(tt assert.TestingT, err error, i ...interface{}) bool {
+				return assert.Nil(t, err)
 			},
 		},
 		"error on read": {
@@ -90,7 +101,7 @@ func Test_SaveConfig(t *testing.T) {
 					},
 				},
 			},
-			expectedFilePath: CONFIG_FILE,
+			expectedFilePath: config.GetConfigFilePath(),
 			expectedError: func(tt assert.TestingT, err error, i ...interface{}) bool {
 				return assert.Nil(t, err)
 			},
@@ -108,7 +119,81 @@ func Test_SaveConfig(t *testing.T) {
 
 			assert.Equal(t, test.expectedFilePath, capturedPath)
 			assert.NotEmpty(t, capturedWrite)
+		})
+	}
+}
 
+func Test_Config_GetUserByName(t *testing.T) {
+	tests := map[string]struct {
+		users          []User
+		inputUserName  string
+		expectedResult *User
+	}{
+		"happy path": {
+			users: []User{
+				{
+					Name:                "user_a",
+					SessionBase64String: "a1b2c3",
+				},
+				{
+					Name:                "user_b",
+					SessionBase64String: "x9y8z7",
+				},
+			},
+			inputUserName: "user_b",
+			expectedResult: &User{
+				Name:                "user_b",
+				SessionBase64String: "x9y8z7",
+			},
+		},
+		"user not found": {
+			users: []User{
+				{
+					Name:                "user_a",
+					SessionBase64String: "a1b2c3",
+				},
+			},
+			inputUserName:  "user_b",
+			expectedResult: nil,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			config := Config{
+				Users: test.users,
+			}
+
+			user := config.GetUserByName(test.inputUserName)
+			assert.Equal(t, test.expectedResult, user)
+		})
+	}
+}
+
+func Test_Config_GetDownloadFolder(t *testing.T) {
+	tests := map[string]struct {
+		activeUser             *User
+		basePath               string
+		expectedDownloadFolder string
+	}{
+		"happy path": {
+			activeUser: &User{
+				Name: "username",
+			},
+			basePath:               "/my/base/path",
+			expectedDownloadFolder: "/my/base/path/username/albums",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			config := Config{
+				BasePath:   test.basePath,
+				ActiveUser: test.activeUser,
+			}
+
+			result := config.GetDownloadFolder()
+			assert.Equal(t, test.expectedDownloadFolder, result)
 		})
 	}
 }
