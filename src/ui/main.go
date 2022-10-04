@@ -36,16 +36,7 @@ type GetUsername struct {
 func (g GetUsername) Get() (*string, error) {
 	if len(g.Config.Users) == 0 {
 		source := g.ValueSources[promptName]
-		name, err := source()
-
-		if err != nil {
-			return nil, err
-		}
-
-		g.Config.Users = append(g.Config.Users, domain.User{
-			Name: *name,
-		})
-		return name, nil
+		return source()
 	} else {
 		source := g.ValueSources[selectName]
 		result, err := source()

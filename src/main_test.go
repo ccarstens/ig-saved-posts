@@ -8,6 +8,7 @@ import (
 func Test_ShouldContinueBasedOnResults(t *testing.T) {
 	tests := map[string]struct {
 		input          []int
+		syncAll        bool
 		expectedOutput bool
 	}{
 		"empty input": {
@@ -30,11 +31,16 @@ func Test_ShouldContinueBasedOnResults(t *testing.T) {
 			input:          []int{20, 20, 10, 0, 0},
 			expectedOutput: false,
 		},
+		"syncAll overrides everything else": {
+			input:          []int{20, 20, 10, 0, 0},
+			syncAll:        true,
+			expectedOutput: true,
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := ShouldContinueBasedOnResults(test.input)
+			result := ShouldContinueBasedOnResults(test.input, test.syncAll)
 			if result != test.expectedOutput {
 				fmt.Println(fmt.Sprintf("%s: %v does not equal %v", name, result, test.expectedOutput))
 				t.Fail()

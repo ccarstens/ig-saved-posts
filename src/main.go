@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -45,7 +46,11 @@ var writeFile domain.SaveFileFn = func(data []byte, path string) error {
 	return err
 }
 
+var syncAll bool
+
 func main() {
+	syncAll = getShouldSyncAll()
+
 	config, err := domain.ReadConfig(readFile)
 	if config.BasePath == "" {
 		basePath, err := ui.PromptBasePath()
@@ -72,6 +77,9 @@ func main() {
 	defer saveSession(*username, insta, config)
 
 	c := insta.Collections
+	if syncAll {
+		fmt.Println("Flag -all passed, syncing everything")
+	}
 	fmt.Println("Fetching Albums now")
 	for c.Next() {
 		if c.Error() != nil {
@@ -93,7 +101,7 @@ func main() {
 	for _, collection := range c.Items[1:] {
 		taskCount := downloadCollection(*collection, tasksIn, config.GetDownloadFolder())
 		collectionDownloadResults = append(collectionDownloadResults, taskCount)
-		if !ShouldContinueBasedOnResults(collectionDownloadResults) {
+		if !ShouldContinueBasedOnResults(collectionDownloadResults, syncAll) {
 			fmt.Println("it seems like there isn't any new content, aborting execution")
 			break
 		}
@@ -167,7 +175,7 @@ func downloadCollection(c goinsta.Collection, in chan DownloadTask, downloadFold
 		itemsToProcess := c.Items[loaded:]
 		tasks := getDownloadTasksFromItems(itemsToProcess, c.Name, downloadFolder)
 		downloadTaskCounts = append(downloadTaskCounts, len(tasks))
-		if len(tasks) == 0 && !ShouldContinueBasedOnResults(downloadTaskCounts) {
+		if len(tasks) == 0 && !ShouldContinueBasedOnResults(downloadTaskCounts, syncAll) {
 			fmt.Println(fmt.Sprintf("skipping album %s for lack of new content", c.Name))
 			break
 		}
@@ -209,7 +217,11 @@ func downloadDaemon(in chan DownloadTask, wg *sync.WaitGroup) {
 	}
 }
 
-func ShouldContinueBasedOnResults(input []int) bool {
+func ShouldContinueBasedOnResults(input []int, syncAll bool) bool {
+	if syncAll {
+		return true
+	}
+
 	const numberOfLastZeroesToTrigger = 2
 	if len(input) < 2 {
 		return true
@@ -238,7 +250,7 @@ func getClient(username string, config *domain.Config) (*goinsta.Instagram, erro
 		if err != nil {
 			return nil, err
 		}
-		return getNewLoginClient(user.Name, *password, config)
+		return getNewLoginClient(username, *password, config)
 	}
 }
 
@@ -269,7 +281,10 @@ func getNewLoginClient(user, pw string, config *domain.Config) (*goinsta.Instagr
 	if err != nil {
 		return nil, err
 	}
-	config.GetUserByName(user).SessionBase64String = sessionString
+	config.Users = append(config.Users, domain.User{
+		Name:                user,
+		SessionBase64String: sessionString,
+	})
 	defer config.Save(writeFile)
 	return insta, nil
 }
@@ -283,4 +298,10 @@ func saveSession(username string, insta *goinsta.Instagram, cfg *domain.Config) 
 	}
 	cfg.GetUserByName(username).SessionBase64String = sessionString
 	return cfg.Save(writeFile)
+}
+
+func getShouldSyncAll() bool {
+	all := flag.Bool("all", false, "pass this flag if nothing should be skipped")
+	flag.Parse()
+	return *all
 }
