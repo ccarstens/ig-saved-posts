@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
+	"image"
+	"image/jpeg"
 	"log"
+	"log/slog"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -185,6 +190,26 @@ func downloadDaemon(in chan DownloadTask, wg *sync.WaitGroup) {
 		}
 
 		fullFileName := path.Join(task.FolderPath, task.FileName)
+
+		var bts []byte
+		if strings.HasSuffix(fullFileName, ".jpg") {
+			img, format, err := image.Decode(bytes.NewReader(data))
+			if err != nil {
+				slog.Error("Error decoding image", slog.String("path", fullFileName))
+				panic(err)
+			}
+			if format == "jpeg" {
+				buf := bytes.NewBuffer(bts)
+				err := jpeg.Encode(buf, img, nil)
+				if err != nil {
+					panic(err)
+				}
+				bts = buf.Bytes()
+			}
+		} else {
+			bts = data
+		}
+
 		err = io.WriteFile(data, fullFileName)
 		if err != nil {
 			panic(err)

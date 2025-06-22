@@ -29,6 +29,7 @@ var WriteFile domain.SaveFileFn = func(data []byte, path string) error {
 	}
 
 	file, err := os.Create(path)
+	defer file.Close()
 	if err != nil {
 		return err
 	}
