@@ -58,12 +58,12 @@ func main() {
 		fmt.Println("Flag -all passed, syncing everything")
 	}
 	fmt.Println("Fetching Albums now")
-	for c.Next() {
-		if c.Error() != nil {
-			panic(c.Error())
-		}
-		fmt.Printf("fetched %d more collections\n", c.NumResults)
-	}
+	//for c.Next() {
+	//	if c.Error() != nil {
+	//		panic(c.Error())
+	//	}
+	//	fmt.Printf("fetched %d more collections\n", c.NumResults)
+	//}
 
 	var wgDaemon sync.WaitGroup
 
@@ -75,14 +75,25 @@ func main() {
 	}
 
 	collectionDownloadResults := []int{}
-	for _, collection := range c.Items[1:] {
-		if collection.Name == "Audio" {
-			continue
+	for c.Next() {
+		if c.Error() != nil {
+			panic(c.Error())
 		}
-		taskCount := downloadCollection(*collection, tasksIn, config.GetDownloadFolder())
-		collectionDownloadResults = append(collectionDownloadResults, taskCount)
-		if !ShouldContinueBasedOnResults(collectionDownloadResults, syncAll) {
-			fmt.Println("it seems like there isn't any new content, aborting execution")
+		fmt.Printf("fetched %d more collections\n", c.NumResults)
+		contin := true
+		for _, collection := range c.Items[1:] {
+			if collection.Name == "Audio" {
+				continue
+			}
+			taskCount := downloadCollection(*collection, tasksIn, config.GetDownloadFolder())
+			collectionDownloadResults = append(collectionDownloadResults, taskCount)
+			if !ShouldContinueBasedOnResults(collectionDownloadResults, syncAll) {
+				fmt.Println("it seems like there isn't any new content, aborting execution")
+				contin = false
+				break
+			}
+		}
+		if !contin {
 			break
 		}
 	}
